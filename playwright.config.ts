@@ -1,12 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
+import { getEnvConfig } from './utils/environment';
 
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+const envConfig = getEnvConfig();
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -23,10 +26,12 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* Global timeout for all actions */
+  timeout: 30000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
-    // baseURL: 'http://localhost:3000',
+    baseURL: envConfig.baseURL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -35,45 +40,53 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
+      name: 'smoke-chromium',
+      testDir: './tests/smoke',
       use: { ...devices['Desktop Chrome'] },
     },
 
     {
-      name: 'firefox',
+      name: 'smoke-firefox',
+      testDir: './tests/smoke',
       use: { ...devices['Desktop Firefox'] },
     },
 
+    // Mobile tests - iOS (slower emulation, increased timeouts)
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'smoke-iphone',
+      testDir: './tests/smoke',
+      timeout: 60000, // 60s per test for iOS
+      use: {
+        ...devices['iPhone 12'],
+        navigationTimeout: 30000,
+        actionTimeout: 10000,
+      },
     },
 
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
+    // Mobile tests - Android
+    {
+      name: 'smoke-android',
+      testDir: './tests/smoke',
+      timeout: 45000, // 45s per test for Android
+      use: {
+        ...devices['Pixel 5'],
+        navigationTimeout: 25000,
+        actionTimeout: 8000,
+      },
+    },
 
-    /* Test against branded browsers. */
+    // Regression tests (commented out until more tests added)
     // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    //   name: 'regression-chromium',
+    //   testDir: './tests/regression',
+    //   use: { ...devices['Desktop Chrome'] },
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
+  /* Run your local dev server before starting the tests (uncomment if using LOCAL environment) */
+  // webServer: process.env.ENVIRONMENT === 'LOCAL' ? {
+  //   command: 'npm run dev',
+  //   url: 'http://localhost:5173',
   //   reuseExistingServer: !process.env.CI,
-  // },
+  // } : undefined,
 });
