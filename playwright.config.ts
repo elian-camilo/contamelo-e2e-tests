@@ -26,6 +26,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* Global timeout for all actions */
+  timeout: 30000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
@@ -49,18 +51,28 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
 
-    // Mobile tests - iOS
+    // Mobile tests - iOS (slower emulation, increased timeouts)
     {
       name: 'smoke-iphone',
       testDir: './tests/smoke',
-      use: { ...devices['iPhone 12'] },
+      timeout: 60000, // 60s per test for iOS
+      use: {
+        ...devices['iPhone 12'],
+        navigationTimeout: 30000,
+        actionTimeout: 10000,
+      },
     },
 
     // Mobile tests - Android
     {
       name: 'smoke-android',
       testDir: './tests/smoke',
-      use: { ...devices['Pixel 5'] },
+      timeout: 45000, // 45s per test for Android
+      use: {
+        ...devices['Pixel 5'],
+        navigationTimeout: 25000,
+        actionTimeout: 8000,
+      },
     },
 
     // Regression tests (commented out until more tests added)

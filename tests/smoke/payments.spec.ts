@@ -61,6 +61,11 @@ test.describe('Pagos', () => {
       // Pagamos la deuda restante para limpiarla del dashboard
       await debtDetailPage.payInFull();
     });
+
+    await given('se limpia el contacto', async () => {
+      // Con soft delete, ahora podemos eliminar contactos con deudas saldadas
+      await apiClient.deleteContact(contact.id);
+    });
   });
 
   test('un usuario puede pagar una deuda completamente @smoke', async ({
@@ -115,7 +120,9 @@ test.describe('Pagos', () => {
       await expect(debtDetailSection).toBeVisible({ timeout: 5000 });
     });
 
-    // No hacemos cleanup porque la API previene eliminar contactos con deudas pendientes
-    // Los datos de test se acumulan pero no afecta los tests siguientes
+    await given('se limpia el contacto', async () => {
+      // Con soft delete, ahora podemos eliminar contactos con deudas saldadas
+      await apiClient.deleteContact(contact.id);
+    });
   });
 });

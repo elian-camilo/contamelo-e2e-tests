@@ -19,10 +19,15 @@ export interface ContactPublic {
 
 export interface DebtPublic {
   id: string;
-  amount: number;
-  remaining_amount: number;
+  amount: number | string;
+  remaining_amount: number | string;
   is_settled: boolean;
   created_at: string;
+  contact_id: string;
+  contact_name: string;
+  description: string;
+  debt_direction: string;
+  due_date: string;
 }
 
 export interface AbonoPublic {
@@ -127,12 +132,33 @@ export class ApiClient {
     return response.json();
   }
 
+  async listDebts(): Promise<DebtPublic[]> {
+    const response = await this.context.get('debts/', {
+      headers: this.authHeaders(),
+    });
+    if (!response.ok()) {
+      throw new Error(`listDebts failed: ${response.status()} ${await response.text()}`);
+    }
+    const data = await response.json();
+    // API retorna { items: DebtPublic[], total, offset, limit }
+    return Array.isArray(data) ? data : data.items || [];
+  }
+
   async deleteContact(contactId: string): Promise<void> {
     const response = await this.context.delete(`contacts/${contactId}`, {
       headers: this.authHeaders(),
     });
     if (!response.ok()) {
       throw new Error(`deleteContact failed: ${response.status()} ${await response.text()}`);
+    }
+  }
+
+  async deleteDebt(debtId: string): Promise<void> {
+    const response = await this.context.delete(`debts/${debtId}`, {
+      headers: this.authHeaders(),
+    });
+    if (!response.ok()) {
+      throw new Error(`deleteDebt failed: ${response.status()} ${await response.text()}`);
     }
   }
 
