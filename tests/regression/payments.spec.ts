@@ -3,7 +3,7 @@ import { test, expect } from '../../fixtures/test-fixtures';
 import { given, when, then } from '../../utils/bdd';
 
 test.describe('Pagos', () => {
-  test('un usuario puede hacer un abono parcial a una deuda @smoke', async ({
+  test('un usuario puede hacer un abono parcial a una deuda @regression', async ({
     page,
     authenticatedPage,
     apiClient,
@@ -68,7 +68,7 @@ test.describe('Pagos', () => {
     });
   });
 
-  test('un usuario puede pagar una deuda completamente @smoke', async ({
+  test('un usuario puede pagar una deuda completamente @regression', async ({
     page,
     authenticatedPage,
     apiClient,

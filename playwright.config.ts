@@ -41,22 +41,27 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    // Smoke tier (develop) — login + dashboard only, Chromium-only per decision.
     {
       name: 'smoke-chromium',
       testDir: './tests/smoke',
       use: { ...devices['Desktop Chrome'] },
     },
 
+    // Regression tier (staging) — full write-heavy suite, 4-browser matrix.
     {
-      name: 'smoke-firefox',
-      testDir: './tests/smoke',
+      name: 'regression-chromium',
+      testDir: './tests/regression',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'regression-firefox',
+      testDir: './tests/regression',
       use: { ...devices['Desktop Firefox'] },
     },
-
-    // Mobile tests - iOS (slower emulation, increased timeouts)
     {
-      name: 'smoke-iphone',
-      testDir: './tests/smoke',
+      name: 'regression-iphone',
+      testDir: './tests/regression',
       timeout: 60000, // 60s per test for iOS
       use: {
         ...devices['iPhone 12'],
@@ -64,11 +69,9 @@ export default defineConfig({
         actionTimeout: 10000,
       },
     },
-
-    // Mobile tests - Android
     {
-      name: 'smoke-android',
-      testDir: './tests/smoke',
+      name: 'regression-android',
+      testDir: './tests/regression',
       timeout: 45000, // 45s per test for Android
       use: {
         ...devices['Pixel 5'],
@@ -77,12 +80,12 @@ export default defineConfig({
       },
     },
 
-    // Regression tests (commented out until more tests added)
-    // {
-    //   name: 'regression-chromium',
-    //   testDir: './tests/regression',
-    //   use: { ...devices['Desktop Chrome'] },
-    // },
+    // Readonly tier (main/prod) — login-only, zero writes ever.
+    {
+      name: 'readonly-chromium',
+      testDir: './tests/readonly',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 
   /* Run your local dev server before starting the tests (uncomment if using LOCAL environment) */
