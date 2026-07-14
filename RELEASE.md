@@ -1,5 +1,28 @@
 # Release Notes
 
+## [0.2.0] - 2026-07-14
+
+### Test Tiers & CI Reporting
+
+#### Features
+- Suite restructured into 3 environment-specific tiers: `smoke` (`tests/smoke/`, develop, login+dashboard, Chromium-only), `regression` (`tests/regression/`, staging, full write-heavy suite, 4-browser matrix — the former single smoke suite moved here unchanged), `readonly` (`tests/readonly/`, main/prod, login-only, zero writes ever)
+- `playwright.config.ts` projects rebuilt per tier: `smoke-chromium`, `regression-{chromium,firefox,iphone,android}`, `readonly-chromium`
+- `e2e.yml` now accepts a `tier` field (via `repository_dispatch` payload or `workflow_dispatch` input) and maps it to the right `--project` flags
+- Rich per-test email reporting via Resend: `scripts/build-email-html.js` renders a summary table (name/project/status/duration/error snippet) from Playwright's `json` reporter output, sent on every run (pass or fail) with a link to the full Actions run/artifact — never the full report as an attachment
+- Removed `tests/example.spec.ts` (leftover npm-init boilerplate)
+
+#### Infrastructure
+- `contamelo-app` gained an Alembic migration gate (`migrations` job in `pr-checks.yml`): auto-applies on develop/staging, detect-only on main — closes the "is the DB schema in sync with what's about to deploy" gap upstream of this repo's E2E runs (see `contamelo-app/docs/CICD_ARQUITECTURA.md`)
+- `trigger-e2e.yml` in `contamelo-app` now also resolves `develop` (previously only staging/main dispatched E2E at all)
+
+#### Fixes
+- Fixed Vercel Deployment Protection bypass being sent as a global browser-context header, which broke CORS preflight against the Railway API (different origin, header not in `Access-Control-Allow-Headers`). Now sent as a query param + cookie scoped to the frontend domain only, set on first navigation to login.
+
+#### Validated
+- Full pipeline validated end-to-end against real production conditions: a deliberately broken `readonly` test on `main` triggered a real failure, the Resend email arrived with the rich summary, the report artifact was downloaded, and `npx playwright show-report` surfaced the actual trace — confirming the whole diagnostic loop works, not just in isolation.
+
+---
+
 ## [0.1.0] - 2026-07-13
 
 ### Initial Release

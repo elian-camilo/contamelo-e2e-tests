@@ -32,31 +32,37 @@ Para DEV/STAGING/PROD: los ambientes están online, no requiere setup local.
 
 ## Ejecutar Tests
 
-### Todos los tests smoke (todos los proyectos)
+Los tests están organizados en 3 tiers, cada uno con su propio set de proyectos Playwright (ver
+"Proyectos Disponibles" más abajo). Elegí el proyecto según qué querés validar.
+
+### Tier smoke (login + dashboard, Chromium)
 ```bash
-npm test
+npx playwright test --project=smoke-chromium
 ```
 
-### Solo desktop (chromium + firefox)
+### Tier regression — todo (4 navegadores/dispositivos)
 ```bash
-npx playwright test tests/smoke/ --project=smoke-chromium --project=smoke-firefox
+npx playwright test --project=regression-chromium --project=regression-firefox --project=regression-iphone --project=regression-android
 ```
 
-### Solo mobile (iPhone + Android)
+### Tier regression — solo desktop (chromium + firefox)
 ```bash
-npx playwright test tests/smoke/ --project=smoke-iphone --project=smoke-android
+npx playwright test --project=regression-chromium --project=regression-firefox
 ```
 
-### Solo un navegador/dispositivo
+### Tier regression — solo mobile (iPhone + Android)
 ```bash
-npx playwright test tests/smoke/ --project=smoke-chromium
-npx playwright test tests/smoke/ --project=smoke-iphone
-npx playwright test tests/smoke/ --project=smoke-android
+npx playwright test --project=regression-iphone --project=regression-android
+```
+
+### Tier readonly (solo login, seguro contra producción real)
+```bash
+npx playwright test --project=readonly-chromium
 ```
 
 ### Solo tests de un archivo
 ```bash
-npx playwright test tests/smoke/auth.spec.ts
+npx playwright test tests/regression/debts.spec.ts
 ```
 
 ### Tests específicos (por nombre)
@@ -103,12 +109,20 @@ npx playwright test --headed
 
 ## Estructura
 
+Los tests están divididos en 3 tiers (uno por ambiente), cada uno en su propio directorio:
+
 ```
-tests/smoke/           # Tests humo (flujos críticos)
-  ├── auth.spec.ts     # Login
-  ├── contacts.spec.ts # Crear/listar contactos
-  ├── debts.spec.ts    # Crear deudas
-  └── payments.spec.ts # Abono parcial / pago completo
+tests/smoke/            # Tier smoke — develop. Login + dashboard, nada más.
+  └── auth.spec.ts
+tests/regression/       # Tier regression — staging. Suite completa de escritura.
+  ├── contacts.spec.ts  # Crear/listar contactos
+  ├── debts.spec.ts     # Crear deudas
+  └── payments.spec.ts  # Abono parcial / pago completo
+tests/readonly/         # Tier readonly — main/prod. Solo login, cero escrituras.
+  └── auth.spec.ts      # Duplicado deliberado de tests/smoke/auth.spec.ts (ver
+                         # comentario ponytail: en el archivo) — mantiene el tier
+                         # que corre contra prod real aislado de cualquier cambio
+                         # futuro en el tier smoke.
 pages/                 # Page Object Models (POMs)
   ├── LoginPage.ts
   ├── DashboardPage.ts
@@ -148,21 +162,46 @@ await then('ve el resultado esperado', async () => {
 
 ## Proyectos Disponibles
 
-Los tests están configurados para ejecutarse en 4 proyectos diferentes:
+Cada tier mapea a uno o más proyectos Playwright (`testDir` propio, definido en
+`playwright.config.ts`):
 
-| Proyecto | Dispositivo | Viewport |
-|----------|------------|----------|
-| `smoke-chromium` | Desktop Chrome | 1280x720 |
-| `smoke-firefox` | Desktop Firefox | 1280x720 |
-| `smoke-iphone` | iPhone 12 | 390x844 |
-| `smoke-android` | Pixel 5 | 393x851 |
+| Proyecto | Tier | Dispositivo |
+|----------|------|-------------|
+| `smoke-chromium` | smoke | Desktop Chrome |
+| `regression-chromium` | regression | Desktop Chrome |
+| `regression-firefox` | regression | Desktop Firefox |
+| `regression-iphone` | regression | iPhone 12 |
+| `regression-android` | regression | Pixel 5 |
+| `readonly-chromium` | readonly | Desktop Chrome |
 
-**Nota**: Contámelo es principalmente una PWA mobile, por lo que los tests en `smoke-iphone` y `smoke-android` son críticos para validar la experiencia móvil.
+**Nota**: Contámelo es principalmente una PWA mobile, por lo que los tests del tier `regression` en
+`regression-iphone` y `regression-android` son críticos para validar la experiencia móvil — es el
+único tier con matriz de 4 dispositivos, justamente porque staging es donde se valida la suite
+completa antes de promover a producción.
+
+## Vercel Deployment Protection (correr contra dev/staging localmente)
+
+Los dominios `dev.contamelo.com.co` y `staging.contamelo.com.co` están detrás de **Vercel
+Authentication** (Preview Deployment Protection) — sin el bypass, Playwright aterriza en la pantalla
+de login de Vercel en vez de la app. Para correr tests contra `ENVIRONMENT=DEV` o `STAGING` en local,
+agregá al `.env`:
+
+```bash
+VERCEL_PROTECTION_BYPASS=<secret del bypass de automatización, configurado en Vercel>
+```
+
+No hace falta para `LOCAL` (no pasa por Vercel) ni para `PROD` (el dominio de producción no tiene
+este muro). El secret se manda como query param + cookie en la primera navegación al login — nunca
+como header global, porque eso rompería el preflight CORS contra la API en Railway (detalle completo
+en `contamelo-app/docs/CICD_ARQUITECTURA.md`).
 
 ## CI/CD
 
-En CI (GitHub Actions, etc.), los tests corren con:
-- `ENVIRONMENT=DEV` (o el ambiente de staging)
+En CI (GitHub Actions), el workflow `e2e.yml` se dispara vía `repository_dispatch` desde
+`contamelo-app` (evento `run-e2e-tests`) con el `environment` y el `tier` ya resueltos, o
+manualmente vía `workflow_dispatch` para debug. Corre con:
+- `ENVIRONMENT` y `TIER` recibidos en el payload (o elegidos a mano en el disparo manual)
 - 1 worker (sin paralelismo, para evitar rate limit en API)
 - 2 reintentos por test fallido
-- Todos los proyectos (desktop + mobile)
+- Solo los proyectos del tier correspondiente (ver tabla arriba)
+- Reporte HTML subido como artefacto + email de resumen por Resend al terminar (pass o fail)
