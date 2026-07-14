@@ -3,7 +3,7 @@ import { test, expect } from '../../fixtures/test-fixtures';
 import { given, when, then } from '../../utils/bdd';
 
 test.describe('Deudas', () => {
-  test('un usuario puede registrar una deuda a un contacto existente @smoke', async ({
+  test('un usuario puede registrar una deuda a un contacto existente @regression', async ({
     page,
     authenticatedPage,
     apiClient,
