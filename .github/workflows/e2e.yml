@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (staging | production)"
+        description: "Target environment (staging | prod)"
         required: true
         default: "staging"
-      url:
-        description: "Base URL to test against"
-        required: true
+        type: choice
+        options:
+          - staging
+          - prod
 
 jobs:
   e2e:
@@ -17,8 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      TARGET_ENV: ${{ github.event.client_payload.environment || inputs.environment }}
-      TARGET_URL: ${{ github.event.client_payload.url || inputs.url }}
+      # utils/environment.ts uppercases this and looks it up in its config map
+      # (LOCAL | DEV | STAGING | PROD) — it resolves baseURL/apiURL itself.
+      ENVIRONMENT: ${{ github.event.client_payload.environment || inputs.environment }}
+      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -38,13 +42,11 @@ jobs:
 
       - name: Run Playwright tests
         run: npx playwright test
-        env:
-          BASE_URL: ${{ env.TARGET_URL }}
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ env.TARGET_ENV }}
+          name: playwright-report-${{ env.ENVIRONMENT }}
           path: playwright-report/
           retention-days: 14
