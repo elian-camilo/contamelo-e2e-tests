@@ -14,7 +14,16 @@ export class LoginPage {
   }
 
   async goto() {
-    await this.page.goto('/login');
+    // dev/staging sit behind Vercel Deployment Protection. The bypass secret
+    // must travel as a query param (not a header) so it only ever reaches
+    // this frontend origin and never gets attached to CORS preflights toward
+    // the Railway API. It sets a cookie on first navigation, so it only
+    // needs to be appended once per browser context.
+    const bypass = process.env.VERCEL_PROTECTION_BYPASS;
+    const url = bypass
+      ? `/login?x-vercel-protection-bypass=${bypass}&x-vercel-set-bypass-cookie=true`
+      : '/login';
+    await this.page.goto(url);
   }
 
   async login(email: string, password: string) {
