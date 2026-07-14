@@ -97,6 +97,13 @@ jobs:
           # E2E_NOTIFY_EMAILS is "a@x.com, b@y.com" — turn it into a JSON array.
           to_json=$(echo "$E2E_NOTIFY_EMAILS" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | jq -R . | jq -sc .)
 
+          # Per-test summary table (name/project/status/duration + error snippet
+          # on failures), built from the JSON reporter output (test-results.json).
+          # The full HTML report with traces/screenshots stays in the uploaded
+          # artifact, linked below — not attached to the email.
+          RESULT="$result" ENVIRONMENT="$ENVIRONMENT" TIER="$TIER" RUN_URL="$RUN_URL" \
+            node scripts/build-email-html.js test-results.json > /tmp/email-body.html
+
           # Build with jq -n instead of heredoc interpolation so MAIL_FROM/html
           # content is always properly JSON-escaped, even if it ever contains
           # quotes/backslashes — a malformed payload would otherwise silently
@@ -105,7 +112,7 @@ jobs:
             --arg from "$MAIL_FROM" \
             --argjson to "$to_json" \
             --arg subject "[Contámelo E2E] $result — $ENVIRONMENT / $TIER" \
-            --arg html "<p>Environment: <b>$ENVIRONMENT</b></p><p>Tier: <b>$TIER</b></p><p>Result: <b>$result</b></p><p><a href=\"$RUN_URL\">View run</a></p>" \
+            --arg html "$(cat /tmp/email-body.html)" \
             '{from: $from, to: $to, subject: $subject, html: $html}')
 
           curl -fsS https://api.resend.com/emails \

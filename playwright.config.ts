@@ -26,8 +26,9 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   /* 'list' streams per-test pass/fail to stdout live (critical for CI logs);
-     'html' still generates the uploaded report artifact. */
-  reporter: [['list'], ['html']],
+     'html' still generates the uploaded report artifact;
+     'json' feeds scripts/build-email-html.js for the CI result email body. */
+  reporter: [['list'], ['html'], ['json', { outputFile: 'test-results.json' }]],
   /* Global timeout for all actions */
   timeout: 30000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
