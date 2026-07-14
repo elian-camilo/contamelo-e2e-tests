@@ -11,16 +11,31 @@ on:
         options:
           - staging
           - prod
+      tier:
+        description: "Test tier to run"
+        required: true
+        default: "regression"
+        type: choice
+        options:
+          - smoke
+          - regression
+          - readonly
 
 jobs:
   e2e:
-    name: Playwright (${{ github.event.client_payload.environment || inputs.environment }})
+    name: Playwright (${{ github.event.client_payload.environment || inputs.environment }} / ${{ github.event.client_payload.tier || inputs.tier }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       # utils/environment.ts uppercases this and looks it up in its config map
       # (LOCAL | DEV | STAGING | PROD) — it resolves baseURL/apiURL itself.
       ENVIRONMENT: ${{ github.event.client_payload.environment || inputs.environment }}
+      # Falls back to 'regression' (today's behavior) if a stale trigger-e2e.yml
+      # in contamelo-app dispatches without a tier field — e.g. mid-rollout if
+      # this repo's tier-aware e2e.yml merges before the other repo's payload
+      # change does. Fails loud via the case's `*)` branch only if TIER is a
+      # genuinely unrecognized non-empty value, not just missing.
+      TIER: ${{ github.event.client_payload.tier || inputs.tier || 'regression' }}
       TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
       TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
       VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
@@ -41,13 +56,59 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      - name: Resolve Playwright project flags for tier
+        id: tier
+        run: |
+          case "$TIER" in
+            smoke)      flags="--project=smoke-chromium" ;;
+            regression) flags="--project=regression-chromium --project=regression-firefox --project=regression-iphone --project=regression-android" ;;
+            readonly)   flags="--project=readonly-chromium" ;;
+            *) echo "::error::unknown tier $TIER"; exit 1 ;;
+          esac
+          echo "flags=$flags" >> "$GITHUB_OUTPUT"
+
       - name: Run Playwright tests
-        run: npx playwright test
+        id: playwright
+        run: npx playwright test ${{ steps.tier.outputs.flags }}
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ env.ENVIRONMENT }}
+          name: playwright-report-${{ env.ENVIRONMENT }}-${{ env.TIER }}
           path: playwright-report/
           retention-days: 14
+
+      - name: Send result email via Resend
+        if: always()
+        continue-on-error: true
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          E2E_NOTIFY_EMAILS: ${{ vars.E2E_NOTIFY_EMAILS }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "${{ steps.playwright.outcome }}" = "success" ]; then
+            result="PASS"
+          else
+            result="FAIL"
+          fi
+
+          # E2E_NOTIFY_EMAILS is "a@x.com, b@y.com" — turn it into a JSON array.
+          to_json=$(echo "$E2E_NOTIFY_EMAILS" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | jq -R . | jq -sc .)
+
+          # Build with jq -n instead of heredoc interpolation so MAIL_FROM/html
+          # content is always properly JSON-escaped, even if it ever contains
+          # quotes/backslashes — a malformed payload would otherwise silently
+          # fail Resend (continue-on-error hides it) instead of being sent.
+          payload=$(jq -n \
+            --arg from "$MAIL_FROM" \
+            --argjson to "$to_json" \
+            --arg subject "[Contámelo E2E] $result — $ENVIRONMENT / $TIER" \
+            --arg html "<p>Environment: <b>$ENVIRONMENT</b></p><p>Tier: <b>$TIER</b></p><p>Result: <b>$result</b></p><p><a href=\"$RUN_URL\">View run</a></p>" \
+            '{from: $from, to: $to, subject: $subject, html: $html}')
+
+          curl -fsS https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
