@@ -1,11 +1,24 @@
 {
   "name": "contamelo-e2e-tests",
-  "version": "0.1.0",
-  "description": "E2E test suite for Contámelo app using Playwright, TypeScript, BDD, and POM",
-  "main": "index.js",
-  "scripts": {},
-  "keywords": [],
-  "author": "",
+  "version": "0.2.0",
+  "description": "E2E test suite for Contámelo — Playwright + TypeScript, POM, BDD-style scenarios, 3 risk-tiered environments (smoke/regression/readonly), and CI-driven email reporting with per-test detail.",
+  "scripts": {
+    "test:smoke": "playwright test --project=smoke-chromium",
+    "test:regression": "playwright test --project=regression-chromium --project=regression-firefox --project=regression-iphone --project=regression-android",
+    "test:readonly": "playwright test --project=readonly-chromium",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "keywords": [
+    "playwright",
+    "e2e",
+    "sdet",
+    "testing",
+    "typescript",
+    "page-object-model",
+    "ci-cd"
+  ],
+  "author": "Elian Camilo Angarita Sanguino <https://www.linkedin.com/in/elian-camilo-angarita-sanguino/>",
   "license": "ISC",
   "devDependencies": {
     "@faker-js/faker": "^10.5.0",
